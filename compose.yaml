@@ -1,0 +1,52 @@
+name: jacobian-fiber-runtime
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: jfr
+      POSTGRES_USER: jfr
+      POSTGRES_PASSWORD: ${JFR_POSTGRES_PASSWORD:?Set JFR_POSTGRES_PASSWORD}
+    volumes:
+      - jfr-postgres:/var/lib/postgresql/data
+    ports:
+      - "${JFR_POSTGRES_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jfr -d jfr"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  runtime:
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      JFR_DATABASE_URL: postgresql://jfr:${JFR_POSTGRES_PASSWORD}@postgres:5432/jfr
+      JFR_API_KEY_PEPPER: ${JFR_API_KEY_PEPPER:?Set JFR_API_KEY_PEPPER}
+      JFR_BOOTSTRAP_API_KEY: ${JFR_BOOTSTRAP_API_KEY:?Set JFR_BOOTSTRAP_API_KEY}
+      JFR_BOOTSTRAP_TENANT: ${JFR_BOOTSTRAP_TENANT:-JFR}
+      JFR_BOOTSTRAP_KEY_NAME: ${JFR_BOOTSTRAP_KEY_NAME:-bootstrap}
+      JFR_LOG_FORMAT: ${JFR_LOG_FORMAT:-json}
+      RUST_LOG: ${RUST_LOG:-jfr=info,tower_http=info}
+    ports:
+      - "${JFR_HTTP_PORT:-18080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  jfr-postgres:

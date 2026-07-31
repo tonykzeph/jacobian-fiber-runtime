@@ -1,0 +1,1774 @@
+openapi: 3.1.0
+info:
+  title: Jacobian Fiber Runtime API
+  version: 0.4.0
+  description: Tenant-scoped API for certified world and assumption fibers, exact finite-domain guarantees, and revocable proof-gated decisions.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /session:
+    get:
+      operationId: getSession
+      responses:
+        "200":
+          description: Authenticated key and tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /keys:
+    get:
+      operationId: listApiKeys
+      responses:
+        "200":
+          description: Tenant API-key metadata; secret material is never returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKey"
+    post:
+      operationId: createApiKey
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKey"
+      responses:
+        "201":
+          description: API-key metadata; the caller retains the submitted token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+  /keys/events:
+    get:
+      operationId: listApiKeyEvents
+      responses:
+        "200":
+          description: Append-only API-key management events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKeyEvent"
+  /keys/{keyId}/revoke:
+    post:
+      operationId: revokeApiKey
+      parameters:
+        - $ref: "#/components/parameters/KeyId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Revoked API-key metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+  /system/capabilities:
+    get:
+      operationId: getCapabilities
+      responses:
+        "200":
+          description: Runtime and verifier capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /cases:
+    get:
+      operationId: listCases
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Tenant cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+    post:
+      operationId: createCase
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCase"
+      responses:
+        "201":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseMutation"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Validation"
+  /cases/{caseId}:
+    get:
+      operationId: getCaseSnapshot
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Materialized case, evidence, branches, events, and audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseSnapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cases/{caseId}/evidence:
+    post:
+      operationId: addEvidence
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddEvidence"
+      responses:
+        "201":
+          description: Evidence committed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceMutation"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /cases/{caseId}/evidence/likelihood:
+    post:
+      operationId: applyLikelihoodEvidence
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyLikelihoodEvidence"
+      responses:
+        "201":
+          description: Evidence and normalized Bayesian posterior committed atomically
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/MutationEnvelope"
+                  - type: object
+                    properties:
+                      resource:
+                        $ref: "#/components/schemas/BayesianUpdate"
+  /cases/{caseId}/observations:
+    post:
+      operationId: recordObservation
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordObservation"
+      responses:
+        "201":
+          description: Observation and evidence committed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceMutation"
+  /cases/{caseId}/fiber/materialize/jacobian:
+    post:
+      operationId: materializeJacobianFiber
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expected_case_version]
+              properties:
+                expected_case_version:
+                  type: integer
+      responses:
+        "201":
+          description: Complete certified algebraic fiber materialized as active branches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiberTransitionMutation"
+  /cases/{caseId}/fiber/advance/jacobian:
+    post:
+      operationId: advanceJacobianFiber
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvanceJacobianFiber"
+      responses:
+        "201":
+          description: Observation, certified successor fiber, and globally matched sheet lineage committed atomically
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiberTransitionMutation"
+  /cases/{caseId}/branches:
+    post:
+      operationId: proposeBranch
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposeBranch"
+      responses:
+        "201":
+          description: Proposed branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchMutation"
+  /branches/{branchId}/validate:
+    post:
+      operationId: validateBranch
+      parameters:
+        - $ref: "#/components/parameters/BranchId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateBranch"
+      responses:
+        "200":
+          description: Validated or contradicted branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchMutation"
+  /branches/{branchId}/verify/jacobian:
+    post:
+      operationId: verifyJacobianBranch
+      parameters:
+        - $ref: "#/components/parameters/BranchId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expected_case_version]
+              properties:
+                expected_case_version:
+                  type: integer
+      responses:
+        "200":
+          description: Branch carrying exact verifier certificate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchMutation"
+  /branches/{branchId}/prune:
+    post:
+      operationId: pruneBranch
+      parameters:
+        - $ref: "#/components/parameters/BranchId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PruneBranch"
+      responses:
+        "200":
+          description: Contradicted branch retained in lineage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchMutation"
+  /branches/{branchId}/split:
+    post:
+      operationId: splitBranch
+      parameters:
+        - $ref: "#/components/parameters/BranchId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, candidates, certificate, expected_case_version]
+              properties:
+                reason:
+                  type: string
+                candidates:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    $ref: "#/components/schemas/BranchCandidate"
+                evidence_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                certificate:
+                  type: object
+                expected_case_version:
+                  type: integer
+      responses:
+        "200":
+          description: Proposed child branches
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/MutationEnvelope"
+                  - type: object
+                    properties:
+                      resource:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Branch"
+  /cases/{caseId}/branches/merge:
+    post:
+      operationId: mergeBranches
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branch_ids, label, state, reason, certificate, expected_case_version]
+              properties:
+                branch_ids:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: string
+                    format: uuid
+                label:
+                  type: string
+                state: {}
+                reason:
+                  type: string
+                evidence_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                certificate:
+                  type: object
+                expected_case_version:
+                  type: integer
+      responses:
+        "200":
+          description: Proposed merged branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchMutation"
+  /cases/{caseId}/assumptions:
+    post:
+      operationId: proposeAssumption
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposeAssumption"
+      responses:
+        "201":
+          description: Persistent assumption branch proposed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssumptionMutation"
+  /assumptions/{assumptionId}/validate:
+    post:
+      operationId: validateAssumption
+      parameters:
+        - $ref: "#/components/parameters/AssumptionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateAssumption"
+      responses:
+        "200":
+          description: Assumption activated or contradicted; contradiction suspends dependent guarantees and revokes permits atomically
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssumptionMutation"
+  /cases/{caseId}/guarantees:
+    post:
+      operationId: createGuarantee
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGuarantee"
+      responses:
+        "201":
+          description: Exact finite-domain guarantee declared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuaranteeMutation"
+  /guarantees/{guaranteeId}/search/exhaustive:
+    post:
+      operationId: searchGuarantee
+      parameters:
+        - $ref: "#/components/parameters/GuaranteeId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionGuard"
+      responses:
+        "200":
+          description: Complete exact proof or certified counterexample
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuaranteeTransitionMutation"
+  /guarantees/{guaranteeId}/counterexamples:
+    post:
+      operationId: submitCounterexample
+      parameters:
+        - $ref: "#/components/parameters/GuaranteeId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignment, source, expected_case_version]
+              properties:
+                assignment:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                source:
+                  type: string
+                  maxLength: 256
+                expected_case_version:
+                  type: integer
+      responses:
+        "200":
+          description: Exact witness accepted, guarantee contradicted, and dependent permits revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuaranteeTransitionMutation"
+  /cases/{caseId}/actions/authorize:
+    post:
+      operationId: authorizeAction
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorizeAction"
+      responses:
+        "200":
+          description: Durable authorized or denied joint-maximin decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionAuthorizationMutation"
+  /cases/{caseId}/decisions/evaluate:
+    post:
+      operationId: evaluateActions
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateActions"
+      responses:
+        "200":
+          description: Ranked actions and selected policy result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /cases/{caseId}/experiments/rank:
+    post:
+      operationId: rankExperiments
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankExperiments"
+      responses:
+        "200":
+          description: Experiments sorted by information gain
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /cases/{caseId}/audit:
+    get:
+      operationId: verifyAudit
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Recomputed ledger report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Audit"
+  /cases/{caseId}/audit/semantic/jacobian:
+    get:
+      operationId: semanticJacobianAudit
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Fresh algebraic recomputation of active-fiber completeness and branch identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemanticFiberAudit"
+  /cases/{caseId}/audit/semantic/guarantees:
+    get:
+      operationId: semanticGuaranteeAudit
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Fresh exact recomputation of guarantee proofs, witnesses, and authorization dependencies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuaranteeSemanticAudit"
+  /cases/{caseId}/events:
+    get:
+      operationId: listEvents
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+        - in: query
+          name: after
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+      responses:
+        "200":
+          description: Ordered ledger events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque API key
+  parameters:
+    CaseId:
+      in: path
+      name: caseId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BranchId:
+      in: path
+      name: branchId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssumptionId:
+      in: path
+      name: assumptionId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    GuaranteeId:
+      in: path
+      name: guaranteeId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    KeyId:
+      in: path
+      name: keyId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Tenant-scoped resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Stale version, reused idempotency key, or invalid lifecycle transition
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Validation:
+      description: Command violates a runtime invariant
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Session:
+      type: object
+      required: [tenant_id, key_id, key_name, scopes]
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+        key_id:
+          type: string
+          format: uuid
+        key_name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    ApiKey:
+      type: object
+      required: [id, tenant_id, name, prefix, scopes, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        prefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: [string, "null"]
+          format: date-time
+        revoked_at:
+          type: [string, "null"]
+          format: date-time
+    CreateApiKey:
+      type: object
+      required: [name, token, scopes]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        token:
+          type: string
+          minLength: 32
+          maxLength: 512
+          writeOnly: true
+        scopes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [runtime:read, runtime:write, runtime:validate, "admin:keys"]
+    ApiKeyEvent:
+      type: object
+      required: [id, tenant_id, actor_key_id, target_key_id, action, metadata, created_at]
+      properties:
+        id:
+          type: integer
+        tenant_id:
+          type: string
+          format: uuid
+        actor_key_id:
+          type: string
+          format: uuid
+        target_key_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [api_key.created, api_key.revoked]
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+    Case:
+      type: object
+      required: [id, tenant_id, name, observation, metadata, version, audit_event_count, audit_head_hash, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        observation: {}
+        metadata:
+          type: object
+        version:
+          type: integer
+        audit_event_count:
+          type: integer
+        audit_head_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Evidence:
+      type: object
+      required: [id, tenant_id, case_id, kind, payload, source, observed_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        payload: {}
+        source:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    Branch:
+      type: object
+      required: [id, tenant_id, case_id, label, state, weight, status, generation, parent_ids, validity, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        state: {}
+        weight:
+          type: number
+          minimum: 0
+        status:
+          type: string
+          enum: [proposed, active, contradicted, superseded, merged, archived]
+        generation:
+          type: integer
+          minimum: 0
+        parent_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        validity:
+          type: object
+        risk_score:
+          type: [number, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Assumption:
+      type: object
+      required: [id, tenant_id, case_id, label, statement, weight, status, generation, parent_ids, validity, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        statement:
+          type: object
+        weight:
+          type: number
+          minimum: 0
+        status:
+          type: string
+          enum: [proposed, active, contradicted, superseded, archived]
+        generation:
+          type: integer
+          minimum: 0
+        parent_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        validity:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Guarantee:
+      type: object
+      required: [id, tenant_id, case_id, label, description, verifier_id, specification, premise_assumption_ids, parent_ids, status, verification, counterexample_count, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        description:
+          type: string
+        verifier_id:
+          type: string
+          const: jfr.finite-rational-refutation.v1
+        specification:
+          $ref: "#/components/schemas/FiniteDomainSpec"
+        premise_assumption_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        parent_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        status:
+          type: string
+          enum: [proposed, verified, contradicted, suspended, superseded, archived]
+        verification:
+          type: object
+        counterexample_count:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Counterexample:
+      type: object
+      required: [id, tenant_id, case_id, guarantee_id, verifier_id, witness, certificate, certificate_hash, source, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        guarantee_id:
+          type: string
+          format: uuid
+        verifier_id:
+          type: string
+        witness:
+          type: object
+          additionalProperties:
+            type: integer
+        certificate:
+          type: object
+        certificate_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        source:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    DecisionAuthorization:
+      type: object
+      required: [id, tenant_id, case_id, requested_action_id, selected_action_id, status, policy, required_guarantee_ids, required_assumption_ids, input, result, input_hash, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        requested_action_id:
+          type: string
+        selected_action_id:
+          type: string
+        status:
+          type: string
+          enum: [authorized, denied, revoked]
+        policy:
+          type: string
+          const: joint_maximin
+        required_guarantee_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        required_assumption_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        input:
+          type: object
+        result:
+          type: object
+        input_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: [string, "null"]
+          format: date-time
+        revocation:
+          type: [object, "null"]
+        updated_at:
+          type: string
+          format: date-time
+    Event:
+      type: object
+      additionalProperties: true
+    Audit:
+      type: object
+      required: [valid, checked_events, head_hash]
+      properties:
+        valid:
+          type: boolean
+        checked_events:
+          type: integer
+        failed_sequence:
+          type: [integer, "null"]
+        reason:
+          type: [string, "null"]
+        head_hash:
+          type: string
+    SemanticFiberAudit:
+      type: object
+      required: [valid, solver, complete, recorded_active_branches, recomputed_branches, matches, maximum_escape_score]
+      properties:
+        valid:
+          type: boolean
+        solver:
+          type: string
+        complete:
+          type: boolean
+        recorded_active_branches:
+          type: integer
+        recomputed_branches:
+          type: integer
+        maximum_escape_score:
+          type: number
+        reason:
+          type: [string, "null"]
+        matches:
+          type: array
+          items:
+            type: object
+            required: [recorded_branch_id, recomputed_label, normalized_distance, valid]
+            properties:
+              recorded_branch_id:
+                type: string
+                format: uuid
+              recomputed_label:
+                type: string
+              normalized_distance:
+                type: number
+              certificate_verifier:
+                type: [string, "null"]
+              valid:
+                type: boolean
+    GuaranteeSemanticAudit:
+      type: object
+      required: [valid, verifier, checked_guarantees, checked_assignments, active_assumptions, verified_guarantees, contradicted_guarantees, suspended_guarantees, authorized_actions, entries]
+      properties:
+        valid:
+          type: boolean
+        verifier:
+          type: string
+        checked_guarantees:
+          type: integer
+        checked_assignments:
+          type: integer
+        active_assumptions:
+          type: integer
+        verified_guarantees:
+          type: integer
+        contradicted_guarantees:
+          type: integer
+        suspended_guarantees:
+          type: integer
+        authorized_actions:
+          type: integer
+        reason:
+          type: [string, "null"]
+        entries:
+          type: array
+          items:
+            type: object
+            required: [guarantee_id, label, status, valid, checked_assignments]
+            properties:
+              guarantee_id:
+                type: string
+                format: uuid
+              label:
+                type: string
+              status:
+                type: string
+              valid:
+                type: boolean
+              checked_assignments:
+                type: integer
+              reason:
+                type: [string, "null"]
+    CreateCase:
+      type: object
+      required: [name, observation]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        observation: {}
+        metadata:
+          type: object
+    AddEvidence:
+      type: object
+      required: [kind, payload, source, expected_case_version]
+      properties:
+        kind:
+          type: string
+        payload: {}
+        source:
+          type: string
+        observed_at:
+          type: [string, "null"]
+          format: date-time
+        expected_case_version:
+          type: integer
+    RecordObservation:
+      type: object
+      required: [observation, source, expected_case_version]
+      properties:
+        observation: {}
+        source:
+          type: string
+        kind:
+          type: string
+          default: observation
+        observed_at:
+          type: [string, "null"]
+          format: date-time
+        expected_case_version:
+          type: integer
+    ApplyLikelihoodEvidence:
+      type: object
+      required: [kind, payload, source, log_likelihood_by_branch, model, expected_case_version]
+      properties:
+        kind:
+          type: string
+        payload: {}
+        source:
+          type: string
+        observed_at:
+          type: [string, "null"]
+          format: date-time
+        log_likelihood_by_branch:
+          type: object
+          additionalProperties:
+            type: number
+        model:
+          type: object
+          required: [id, version, conditional_independence]
+          properties:
+            id:
+              type: string
+            version:
+              type: string
+            conditional_independence:
+              type: string
+        expected_case_version:
+          type: integer
+    AdvanceJacobianFiber:
+      type: object
+      required: [observation, source, expected_case_version]
+      properties:
+        observation: {}
+        source:
+          type: string
+        kind:
+          type: string
+          default: observation
+        observed_at:
+          type: [string, "null"]
+          format: date-time
+        expected_case_version:
+          type: integer
+    ProposeBranch:
+      type: object
+      required: [label, state, expected_case_version]
+      properties:
+        label:
+          type: string
+        state: {}
+        weight:
+          type: number
+          minimum: 0
+          default: 1
+        parent_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        evidence_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        proposal:
+          type: object
+        expected_case_version:
+          type: integer
+    ProposeAssumption:
+      type: object
+      required: [label, statement, expected_case_version]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 256
+        statement:
+          type: object
+        weight:
+          type: number
+          minimum: 0
+          default: 1
+        parent_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        evidence_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        proposal:
+          type: object
+        expected_case_version:
+          type: integer
+    ValidateAssumption:
+      type: object
+      required: [valid, reason, certificate, expected_case_version]
+      properties:
+        valid:
+          type: boolean
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        evidence_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        certificate:
+          type: object
+          minProperties: 1
+        expected_case_version:
+          type: integer
+    FiniteDomainSpec:
+      type: object
+      required: [variables, claim]
+      description: Exact integer-domain theorem. Scalar constants are decimal or rational strings; the verifier evaluates them as arbitrary-precision rational numbers.
+      properties:
+        variables:
+          type: array
+          minItems: 1
+          maxItems: 12
+          items:
+            type: object
+            required: [name, minimum, maximum]
+            properties:
+              name:
+                type: string
+                pattern: "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+              minimum:
+                type: integer
+                minimum: -1000000
+                maximum: 1000000
+              maximum:
+                type: integer
+                minimum: -1000000
+                maximum: 1000000
+        premises:
+          type: array
+          items:
+            $ref: "#/components/schemas/BooleanExpression"
+        claim:
+          $ref: "#/components/schemas/BooleanExpression"
+    BooleanExpression:
+      type: object
+      required: [op]
+      description: Tagged expression using less_than, less_than_or_equal, equal, not_equal, greater_than_or_equal, greater_than, all, any, or not.
+      properties:
+        op:
+          type: string
+          enum: [less_than, less_than_or_equal, equal, not_equal, greater_than_or_equal, greater_than, all, any, not]
+      additionalProperties: true
+    CreateGuarantee:
+      type: object
+      required: [label, description, specification, expected_case_version]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        premise_assumption_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        parent_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        specification:
+          $ref: "#/components/schemas/FiniteDomainSpec"
+        expected_case_version:
+          type: integer
+    VersionGuard:
+      type: object
+      required: [expected_case_version]
+      properties:
+        expected_case_version:
+          type: integer
+    AuthorizeAction:
+      type: object
+      required: [requested_action_id, actions, expected_case_version]
+      properties:
+        requested_action_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        required_guarantee_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        required_assumption_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        actions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, label, utilities]
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              utilities:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [branch_id, assumption_id, utility]
+                  properties:
+                    branch_id:
+                      type: string
+                      format: uuid
+                    assumption_id:
+                      type: string
+                      format: uuid
+                    utility:
+                      type: number
+        expected_case_version:
+          type: integer
+    ValidateBranch:
+      type: object
+      required: [valid, reason, certificate, expected_case_version]
+      properties:
+        valid:
+          type: boolean
+        reason:
+          type: string
+        evidence_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        certificate:
+          type: object
+          minProperties: 1
+        risk_score:
+          type: [number, "null"]
+          minimum: 0
+        expected_case_version:
+          type: integer
+    PruneBranch:
+      type: object
+      required: [reason, certificate, expected_case_version]
+      properties:
+        reason:
+          type: string
+        evidence_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        certificate:
+          type: object
+        expected_case_version:
+          type: integer
+    BranchCandidate:
+      type: object
+      required: [label, state]
+      properties:
+        label:
+          type: string
+        state: {}
+        relative_weight:
+          type: number
+          minimum: 0
+          default: 1
+        validity:
+          type: object
+    EvaluateActions:
+      type: object
+      required: [policy, actions]
+      properties:
+        policy:
+          type: string
+          enum: [expected, robust, distributionally_robust]
+        ambiguity_radius:
+          type: [number, "null"]
+          minimum: 0
+          description: Required KL-divergence radius for distributionally_robust policy.
+        actions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, label, utility_by_branch]
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              utility_by_branch:
+                type: object
+                additionalProperties:
+                  type: number
+    RankExperiments:
+      type: object
+      required: [experiments]
+      properties:
+        experiments:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, label, predictions_by_branch]
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              predictions_by_branch:
+                type: object
+                additionalProperties:
+                  type: object
+                  additionalProperties:
+                    type: number
+                    minimum: 0
+    MutationEnvelope:
+      type: object
+      required: [case_version, event_sequence, event_hash, resource]
+      properties:
+        case_version:
+          type: integer
+        event_sequence:
+          type: integer
+        event_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+    CaseMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              $ref: "#/components/schemas/Case"
+    EvidenceMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              $ref: "#/components/schemas/Evidence"
+    BranchMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              $ref: "#/components/schemas/Branch"
+    AssumptionMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              $ref: "#/components/schemas/Assumption"
+    GuaranteeMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              $ref: "#/components/schemas/Guarantee"
+    GuaranteeTransitionMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              type: object
+              required: [guarantee, search, revoked_authorization_ids]
+              properties:
+                guarantee:
+                  $ref: "#/components/schemas/Guarantee"
+                search:
+                  type: object
+                  required: [outcome, verifier_id, specification_hash, total_domain_assignments, examined_assignments, eligible_assignments, certificate]
+                  properties:
+                    outcome:
+                      type: string
+                      enum: [verified, counterexample]
+                    verifier_id:
+                      type: string
+                    specification_hash:
+                      type: string
+                      pattern: "^[0-9a-f]{64}$"
+                    total_domain_assignments:
+                      type: integer
+                    examined_assignments:
+                      type: integer
+                    eligible_assignments:
+                      type: integer
+                    witness:
+                      type: [object, "null"]
+                    certificate:
+                      type: object
+                counterexample:
+                  oneOf:
+                    - $ref: "#/components/schemas/Counterexample"
+                    - type: "null"
+                revoked_authorization_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+    ActionAuthorizationMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              type: object
+              required: [authorization, authorized, selected, scores, scenario_count, dependency_reasons]
+              properties:
+                authorization:
+                  $ref: "#/components/schemas/DecisionAuthorization"
+                authorized:
+                  type: boolean
+                selected:
+                  type: object
+                  additionalProperties: true
+                scores:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                scenario_count:
+                  type: integer
+                dependency_reasons:
+                  type: array
+                  items:
+                    type: string
+    BayesianUpdate:
+      type: object
+      required: [evidence, model_id, model_version, prior_entropy_bits, posterior_entropy_bits, information_gain_bits, log_evidence, weights]
+      properties:
+        evidence:
+          $ref: "#/components/schemas/Evidence"
+        model_id:
+          type: string
+        model_version:
+          type: string
+        prior_entropy_bits:
+          type: number
+        posterior_entropy_bits:
+          type: number
+        information_gain_bits:
+          type: number
+        log_evidence:
+          type: number
+        weights:
+          type: array
+          items:
+            type: object
+            required: [branch_id, prior, log_likelihood, posterior]
+            properties:
+              branch_id:
+                type: string
+                format: uuid
+              prior:
+                type: number
+              log_likelihood:
+                type: number
+              posterior:
+                type: number
+    FiberTransition:
+      type: object
+      required: [solver, observation, complete, superseded_branch_ids, correspondence, branches, global_certificate]
+      properties:
+        solver:
+          type: string
+        observation: {}
+        complete:
+          type: boolean
+        superseded_branch_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        correspondence:
+          type: array
+          items:
+            type: object
+            required: [predecessor_id, successor_id, normalized_distance]
+            properties:
+              predecessor_id:
+                type: string
+                format: uuid
+              successor_id:
+                type: string
+                format: uuid
+              normalized_distance:
+                type: number
+        branches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Branch"
+        evidence:
+          oneOf:
+            - $ref: "#/components/schemas/Evidence"
+            - type: "null"
+        global_certificate:
+          type: object
+    FiberTransitionMutation:
+      allOf:
+        - $ref: "#/components/schemas/MutationEnvelope"
+        - type: object
+          properties:
+            resource:
+              $ref: "#/components/schemas/FiberTransition"
+    CaseSnapshot:
+      type: object
+      required: [case, evidence, branches, assumptions, guarantees, counterexamples, authorizations, events, audit]
+      properties:
+        case:
+          $ref: "#/components/schemas/Case"
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+        branches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Branch"
+        assumptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assumption"
+        guarantees:
+          type: array
+          items:
+            $ref: "#/components/schemas/Guarantee"
+        counterexamples:
+          type: array
+          items:
+            $ref: "#/components/schemas/Counterexample"
+        authorizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionAuthorization"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        audit:
+          $ref: "#/components/schemas/Audit"
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string

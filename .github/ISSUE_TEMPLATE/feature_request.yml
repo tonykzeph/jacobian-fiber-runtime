@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a new verifier, runtime primitive, or application capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and motivating failure mode
+    validations:
+      required: true
+  - type: textarea
+    id: invariant
+    attributes:
+      label: Proposed invariant
+      description: State precisely what the runtime should guarantee.
+    validations:
+      required: true
+  - type: textarea
+    id: trust
+    attributes:
+      label: Trust boundary
+      description: Identify which inputs are proposals and which mechanism verifies validity.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration impact

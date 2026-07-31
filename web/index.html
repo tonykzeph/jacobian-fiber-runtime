@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="description" content="Jacobian Fiber Runtime operator console">
+    <title>JFR · Fiber operator</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div class="auth-gate" id="auth-gate">
+      <div class="auth-mark" aria-hidden="true">
+        <svg viewBox="0 0 220 110">
+          <path d="M4 18 C72 18 66 55 122 55 S164 92 216 92"></path>
+          <path d="M4 55 C70 55 70 55 122 55 S164 55 216 55"></path>
+          <path d="M4 92 C72 92 66 55 122 55 S164 18 216 18"></path>
+        </svg>
+      </div>
+      <form class="auth-panel" id="auth-form">
+        <p class="eyebrow">Jacobian Fiber Runtime</p>
+        <h1>Enter the operator key.</h1>
+        <p class="auth-copy">The key stays in this browser session and is sent only to this origin.</p>
+        <label>
+          API key
+          <input id="api-key" name="api-key" type="password" autocomplete="current-password" minlength="32" required>
+        </label>
+        <button type="submit" class="primary-action">Open runtime</button>
+        <p class="form-error" id="auth-error" role="alert"></p>
+      </form>
+    </div>
+
+    <div class="app-shell" id="app-shell" hidden>
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Jacobian Fiber Runtime">
+          <span class="brand-symbol" aria-hidden="true">∿</span>
+          <span>JFR</span>
+        </a>
+        <div class="topbar-context">
+          <span class="system-status"><i></i> Runtime connected</span>
+          <span id="tenant-label">Tenant</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="text-action" id="refresh-button">Refresh</button>
+          <button class="text-action" id="logout-button">Lock</button>
+        </div>
+      </header>
+
+      <aside class="case-index">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">State spaces</p>
+            <h2>Cases</h2>
+          </div>
+          <button class="icon-action" id="new-case-button" aria-label="Create case">+</button>
+        </div>
+        <div class="case-list" id="case-list"></div>
+        <div class="index-foot">
+          <span id="case-count">0 cases</span>
+          <span>PostgreSQL</span>
+        </div>
+      </aside>
+
+      <main class="fiber-workspace">
+        <section class="case-header">
+          <div>
+            <p class="eyebrow" id="case-id-label">Select a case</p>
+            <h1 id="case-name">No fiber loaded</h1>
+          </div>
+          <div class="case-actions">
+            <button class="primary-action" id="materialize-fiber-button" disabled>Certify fiber</button>
+            <button class="secondary-action" id="advance-fiber-button" disabled>Advance</button>
+            <button class="secondary-action" id="likelihood-button" disabled>Update weights</button>
+            <button class="secondary-action" id="add-evidence-button" disabled>Add evidence</button>
+            <button class="secondary-action" id="add-assumption-button" disabled>Add assumption</button>
+            <button class="text-action" id="propose-branch-button" disabled>Propose manually</button>
+          </div>
+        </section>
+
+        <section class="observation-strip" aria-labelledby="observation-title">
+          <div class="strip-label">
+            <span>Observable</span>
+            <small id="version-label">Version —</small>
+          </div>
+          <pre id="observation-value">Choose a case from the index.</pre>
+        </section>
+
+        <section class="fiber-field" aria-labelledby="fiber-title">
+          <div class="field-heading">
+            <div>
+              <p class="eyebrow">Compatible hidden states</p>
+              <h2 id="fiber-title">Fiber field</h2>
+            </div>
+            <div class="legend">
+              <span><i class="active"></i> Active</span>
+              <span><i class="proposed"></i> Proposed</span>
+              <span><i class="closed"></i> Historical</span>
+            </div>
+          </div>
+          <div class="fiber-canvas" id="fiber-canvas">
+            <div class="empty-state">
+              <span class="empty-glyph">∅</span>
+              <p>Select a case to inspect its branches.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="branch-register">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Persistent identity</p>
+              <h2>Branch register</h2>
+            </div>
+            <span id="active-mass">Active mass —</span>
+          </div>
+          <div class="branch-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Branch</th>
+                  <th>Status</th>
+                  <th>Generation</th>
+                  <th>Weight</th>
+                  <th>Risk</th>
+                </tr>
+              </thead>
+              <tbody id="branch-table">
+                <tr><td colspan="5" class="table-empty">No case selected.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="assurance-workspace" aria-labelledby="assurance-title">
+          <div class="section-heading assurance-heading">
+            <div>
+              <p class="eyebrow">Second-order validity</p>
+              <h2 id="assurance-title">Assurance circuit</h2>
+            </div>
+            <div class="assurance-actions">
+              <strong id="guarantee-semantic-status">Not audited</strong>
+              <button class="secondary-action compact" id="guarantee-audit-button" disabled>Recompute proofs</button>
+            </div>
+          </div>
+          <div class="assurance-flow" aria-label="Assumption fiber to authorization flow">
+            <span class="flow-node">M · assumptions</span>
+            <i>→</i>
+            <span class="flow-node quantifier">∀ X × M</span>
+            <i>→</i>
+            <span class="flow-node">G · guarantees</span>
+            <i>→</i>
+            <span class="flow-node permit">action permit</span>
+          </div>
+          <div class="assurance-grid">
+            <article class="assurance-column">
+              <header>
+                <div><span>Assumption fiber</span><strong id="assumption-count">0 branches</strong></div>
+                <button class="icon-action small" id="assumption-column-button" aria-label="Add assumption" disabled>+</button>
+              </header>
+              <div class="assurance-list" id="assumption-list">
+                <p class="empty-copy">No assumptions declared.</p>
+              </div>
+            </article>
+            <article class="assurance-column guarantee-column">
+              <header>
+                <div><span>Proof gates</span><strong id="guarantee-count">0 guarantees</strong></div>
+                <button class="icon-action small" id="new-guarantee-button" aria-label="Declare guarantee" disabled>+</button>
+              </header>
+              <div class="assurance-list" id="guarantee-list">
+                <p class="empty-copy">No guarantees declared.</p>
+              </div>
+            </article>
+            <article class="assurance-column authorization-column">
+              <header>
+                <div><span>Revocable capabilities</span><strong id="authorization-count">0 decisions</strong></div>
+                <button class="primary-action compact" id="authorize-action-button" disabled>Authorize</button>
+              </header>
+              <div class="assurance-list" id="authorization-list">
+                <p class="empty-copy">No authorization evaluated.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <aside class="evidence-rail">
+        <div class="rail-tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="evidence">Evidence</button>
+          <button role="tab" aria-selected="false" data-tab="ledger">Ledger</button>
+          <button role="tab" aria-selected="false" data-tab="branch">Branch</button>
+        </div>
+        <section class="rail-panel" id="evidence-panel">
+          <div class="rail-heading">
+            <span id="evidence-count">0 records</span>
+          </div>
+          <div id="evidence-list" class="timeline"></div>
+        </section>
+        <section class="rail-panel" id="ledger-panel" hidden>
+          <div class="audit-head">
+            <div>
+              <span>Chain integrity</span>
+              <strong id="audit-status">Not checked</strong>
+            </div>
+            <button class="secondary-action compact" id="audit-button" disabled>Verify</button>
+          </div>
+          <div class="semantic-head">
+            <div><span>Fiber semantics</span><strong id="semantic-status">Run verification</strong></div>
+            <code id="escape-score">escape —</code>
+          </div>
+          <code class="head-hash" id="head-hash">—</code>
+          <div id="event-list" class="timeline ledger"></div>
+        </section>
+        <section class="rail-panel" id="branch-panel" hidden>
+          <div id="branch-detail" class="branch-detail">
+            <p class="empty-copy">Choose a branch from the register.</p>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <dialog id="case-dialog">
+      <form method="dialog" data-submit="case">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">New state space</p><h2>Create case</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <label>Name<input name="name" maxlength="256" required></label>
+        <label>Initial observation<textarea name="observation" rows="7" spellcheck="false" required>{}</textarea></label>
+        <label>Metadata<textarea name="metadata" rows="4" spellcheck="false">{}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Create case</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="evidence-dialog">
+      <form method="dialog" data-submit="evidence">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Constraint record</p><h2>Add evidence</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <div class="form-grid">
+          <label>Kind<input name="kind" value="observation" maxlength="128" required></label>
+          <label>Source<input name="source" placeholder="sensor, verifier, operator…" maxlength="256" required></label>
+        </div>
+        <label>Payload<textarea name="payload" rows="8" spellcheck="false" required>{}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Add evidence</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="advance-dialog">
+      <form method="dialog" data-submit="advance">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Certified continuation</p><h2>Advance the fiber</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <p class="dialog-copy">The solver isolates every inverse root, supersedes the current sheets, and globally matches their lineage in one transaction.</p>
+        <label>Next observation<textarea name="observation" rows="7" spellcheck="false" required>{"x":"-8/27","y":"0","z":"1"}</textarea></label>
+        <div class="form-grid">
+          <label>Kind<input name="kind" value="continuation-target" maxlength="128" required></label>
+          <label>Source<input name="source" value="operator" maxlength="256" required></label>
+        </div>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Solve and advance</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="likelihood-dialog">
+      <form method="dialog" data-submit="likelihood">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Bayesian transition</p><h2>Apply likelihood evidence</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <div class="form-grid">
+          <label>Kind<input name="kind" value="measurement" maxlength="128" required></label>
+          <label>Source<input name="source" value="operator-model" maxlength="256" required></label>
+          <label>Model ID<input name="model_id" value="operator.likelihood" maxlength="128" required></label>
+          <label>Model version<input name="model_version" value="1.0.0" maxlength="128" required></label>
+        </div>
+        <label>Conditional independence declaration<input name="independence" value="Conditionally independent of prior evidence given the active branch." maxlength="2000" required></label>
+        <label>Evidence payload<textarea name="payload" rows="4" spellcheck="false" required>{}</textarea></label>
+        <label>Log likelihood by active branch<textarea name="likelihoods" rows="8" spellcheck="false" required>{}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Commit posterior</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="branch-dialog">
+      <form method="dialog" data-submit="branch">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Hidden state</p><h2>Propose branch</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <div class="form-grid">
+          <label>Label<input name="label" maxlength="256" required></label>
+          <label>Weight<input name="weight" type="number" min="0" step="any" value="1" required></label>
+        </div>
+        <label>State<textarea name="state" rows="9" spellcheck="false" required>{}</textarea></label>
+        <label>Proposal certificate<textarea name="proposal" rows="4" spellcheck="false">{}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Propose branch</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="validation-dialog">
+      <form method="dialog" data-submit="validation">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Validity transition</p><h2>Validate branch</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <fieldset class="validity-choice">
+          <legend>Result</legend>
+          <label><input type="radio" name="valid" value="true" checked> Valid</label>
+          <label><input type="radio" name="valid" value="false"> Contradicted</label>
+        </fieldset>
+        <label>Reason<input name="reason" maxlength="2000" required></label>
+        <label>Certificate<textarea name="certificate" rows="8" spellcheck="false" required>{"verifier":"operator-attestation"}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Record validation</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="assumption-dialog">
+      <form method="dialog" data-submit="assumption">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Model branch</p><h2>Propose assumption</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <p class="dialog-copy">Assumptions are persistent alternatives, not comments. Guarantees and action permits bind to their IDs.</p>
+        <div class="form-grid">
+          <label>Label<input name="label" maxlength="256" required></label>
+          <label>Weight<input name="weight" type="number" min="0" step="any" value="1" required></label>
+        </div>
+        <label>Statement<textarea name="statement" rows="7" spellcheck="false" required>{"model":"nominal"}</textarea></label>
+        <label>Proposal certificate<textarea name="proposal" rows="4" spellcheck="false">{"source":"operator"}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Propose assumption</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="assumption-validation-dialog">
+      <form method="dialog" data-submit="assumption-validation">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Premise validity</p><h2>Validate assumption</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <fieldset class="validity-choice">
+          <legend>Result</legend>
+          <label><input type="radio" name="valid" value="true" checked> Activate</label>
+          <label><input type="radio" name="valid" value="false"> Contradict</label>
+        </fieldset>
+        <label>Reason<input name="reason" maxlength="2000" required></label>
+        <label>Certificate<textarea name="certificate" rows="7" spellcheck="false" required>{"verifier":"operator-attestation"}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Commit validity</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="guarantee-dialog">
+      <form method="dialog" data-submit="guarantee">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Exact proof gate</p><h2>Declare guarantee</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <div class="form-grid">
+          <label>Label<input name="label" value="Non-negative square" maxlength="256" required></label>
+          <label>Premise assumptions<select name="premises" id="guarantee-premises" multiple></select></label>
+        </div>
+        <label>Description<input name="description" value="For every integer in the declared domain, x squared is non-negative." maxlength="4000" required></label>
+        <label>Finite-domain specification<textarea name="specification" rows="15" spellcheck="false" required>{
+  "variables": [{"name":"x","minimum":-12,"maximum":12}],
+  "premises": [],
+  "claim": {
+    "op":"greater_than_or_equal",
+    "left":{"op":"power","base":{"op":"variable","name":"x"},"exponent":2},
+    "right":{"op":"constant","value":"0"}
+  }
+}</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Declare gate</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="authorization-dialog">
+      <form method="dialog" data-submit="authorization">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Joint maximin</p><h2>Evaluate action permit</h2></div>
+          <button class="close-action" value="cancel" aria-label="Close">×</button>
+        </div>
+        <p class="dialog-copy">Every action must cover every active world × assumption pair. Only the joint-maximin action can receive a permit.</p>
+        <div class="form-grid">
+          <label>Requested action ID<input name="requested_action_id" value="safe" maxlength="128" required></label>
+          <label>Required guarantees<select name="guarantees" id="authorization-guarantees" multiple></select></label>
+        </div>
+        <label>Required assumptions<select name="assumptions" id="authorization-assumptions" multiple></select></label>
+        <label>Actions and joint utilities<textarea name="actions" rows="16" spellcheck="false" required>[]</textarea></label>
+        <p class="form-error" data-error role="alert"></p>
+        <div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary-action" value="default">Evaluate and record</button></div>
+      </form>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  </body>
+</html>
